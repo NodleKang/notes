@@ -18,3 +18,7 @@ kubectl create -f nginx.yaml
 kubectl replace --force -f nginx.yaml
 ```
 
+```
+# selector와 라벨을 이용해서 원하는 리소스 찾기
+kubectl get pods --selecotr app=App1
+```
