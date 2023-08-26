@@ -156,3 +156,19 @@ spec:
                 operator: Exists
 status: {}
 ```
+
+## 스케줄러 설정
+
+```yaml
+# 노드 선호도 설정
+apiVersion: v1
+kind: Pod
+metadata:
+  name: myapp-pod
+spec:
+  containers:
+  - name: data_processor
+    image: data-processor
+  schedulerName: my-custom-scheduler
+```
+
