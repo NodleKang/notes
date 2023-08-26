@@ -19,7 +19,6 @@ kubectl taint nodes 노드이름 키-
 kubectl taint nodes node1 app-
 ```
 
-
 # Tolerations
 
 Pod에 적용하는 겁니다.
