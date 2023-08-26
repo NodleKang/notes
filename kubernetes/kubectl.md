@@ -20,6 +20,14 @@ kubectl taint nodes node1 app-
 ```
 
 ```
+# 노드에서 top 명령 실행한 내용보기
+kubectl top node
+
+# 파드에서 top 명령 실행한 내용보기
+kubectl top pod
+```
+
+```
 kubectl get ns     # 네임스페이스
 kubectl get nodes  # 노드
 kubectl get deploy # 디플로이
