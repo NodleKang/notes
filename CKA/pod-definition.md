@@ -7,6 +7,7 @@ apiVersion: v1
 kind: Pod
 metadata: 
   name: nginx
+  namespace: default
   labels:
     name: nginx
 spec:
@@ -49,6 +50,7 @@ apiVersion: v1
 kind: Pod
 metadata:
   name: nginx
+  namespace: default
 target:  # spec 절이 없고, target 절 사용
   apiVersion: v1
   kind: Node
@@ -64,6 +66,7 @@ apiVersion: v1
 kind: Pod
 metadata:
   name: nginx
+  namespace: default
 spec:
   containers
   - name: nginx-container
@@ -79,6 +82,7 @@ apiVersion: v1
 kind: Pod
 metadata:
   name: myapp-pod
+  namespace: default
   labels:
     name: myapp-pod
 spec:
@@ -100,6 +104,7 @@ apiVersion: v1
 kind: Pod
 metadata:
   name: myapp-pod
+  namespace: default
 spec:
   containers:
   - name: data_processor
@@ -127,7 +132,7 @@ Plnned:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  creationTimestamp: null
+  namespace: default
   labels:
     app: red
   name: red
@@ -146,6 +151,12 @@ spec:
       containers:
       - image: nginx
         name: nginx
+        command: ["sleep 5000"]
+        command: 
+        - "sleep"
+        - "5000"
+        command: ["sleep"]
+        args: ["10"]
         resources: {}
       affinity:
         nodeAffinity:
@@ -165,6 +176,7 @@ apiVersion: v1
 kind: Pod
 metadata:
   name: myapp-pod
+  namespace: default
 spec:
   containers:
   - name: data_processor
@@ -172,3 +184,37 @@ spec:
   schedulerName: my-custom-scheduler
 ```
 
+## env 설정
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  namespace: default
+  labels:
+    app: myapp
+spec:
+  containers:
+  - name: myapp
+    image: myapp-image
+    env:
+      - name: APP_COLOR
+        value: pin-k
+      - name: APP_CONFIGMAP
+        valueFrom:
+          configMapKeyRef:
+            name: app-config
+            key: APP_COLOR
+      - name: DB_password
+        valueFrom:
+          secretKeyRef:
+            name: app-secret
+            key: DB_password
+    envFrom:
+      - configMapRef:
+          name: app-config
+      - secretRef:
+          name: app-config
+  - name: log-agent
+    image: log-agent
+```

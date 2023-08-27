@@ -109,9 +109,22 @@ kubectl get events -o wid
 
 ```
 # 로그 확인하기
+kubectl logs <오브젝트이름(주로 파드이름)>
 kubectl logs my-custom-scheduler --name-space=kube-system
 ```
 
 ```
-# 서비스 어카운트
+# 롤아웃 상태 보기
+kubectl rollout status deployment/myapp-deployment
+
+# 롤아웃 이력보기
+kubectl rollout history deployment/myapp-deployment 
+
+# 롤아웃 작업을 롤백하기
+kubectl rollout undo deployment/myapp-deployment
+```
+
+```
+# 디플로이먼트에서 사용하는 파드 이미지 변경
+kubectl set image deployment/myapp-deployment nginx-container=nginx:1.7.1
 ```
