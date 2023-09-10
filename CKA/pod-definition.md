@@ -218,3 +218,65 @@ spec:
   - name: log-agent
     image: log-agent
 ```
+
+## security context 설정
+
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  namespace: default
+  labels:
+    app: myapp
+spec:
+  securityContext:
+    runAsUser: 1000
+  containers:
+  - name: myapp
+    image: myapp-image
+    securityContext:
+      runAsUser: 999
+      capabilities:
+        add: ["MAC_ADMIN"]
+    env:
+      - name: APP_COLOR
+        value: pin-k
+      - name: APP_CONFIGMAP
+        valueFrom:
+          configMapKeyRef:
+            name: app-config
+            key: APP_COLOR
+      - name: DB_password
+        valueFrom:
+          secretKeyRef:
+            name: app-secret
+            key: DB_password
+    envFrom:
+      - configMapRef:
+          name: app-config
+      - secretRef:
+          name: app-config
+  - name: log-agent
+    image: log-agent
+```
+
+## PVC 설정
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: mypod
+spec:
+  containers:
+    - name: myfrontend
+      image: nginx
+      volumeMounts:
+      - mountPath: "/var/www/html"
+        name: mypd
+  volumes:
+    - name: mypd
+      persistentVolumeClaim:
+        claimName: myclaim
+```

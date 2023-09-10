@@ -128,3 +128,42 @@ kubectl rollout undo deployment/myapp-deployment
 # 디플로이먼트에서 사용하는 파드 이미지 변경
 kubectl set image deployment/myapp-deployment nginx-container=nginx:1.7.1
 ```
+
+```
+# 현재 context 업데이트
+# /root/my-kube-config 파일에 있는 prod-user@production 컨텍스트 사용
+# prod-user@production는 production 클러스터에 prod-user 사용자를 의미합니다.
+kubectl config use-context prod-user@production --kubeconfig /root/my-kube-config
+```
+
+```
+# kube-apiserver로 (인증없이) 접근 가능한 포트 노출(8001)
+# kube proxy <> kubectl proxy 둘은 다른 것임!
+kubectl proxy
+
+# kubernetes cluster 내 정적 자원(deployments, pods)에 대한 포트 노출
+kubectl port-forward
+```
+
+```
+# 롤 현황 보기
+kubectl get roles
+
+# 롤바인딩 현황 보기
+kubectl get rolebindings
+
+# 롤 상세보기
+kubectl describe role <롤이름>
+
+# 롤바인딩 상세보기
+kubectl describe rolebinding <롤바인딩이름>
+```
+
+```
+# 특정 작업을 할 권한이 있는지 검사하는 명령들
+kubectl auth can-i create deployment
+kubectl auth can-i delete nodes
+kubectl auth can-i create deployments --as dev-user
+kubectl auth can-i create pods --as dev-user
+kubectl auth can-i create pods --as dev-user --namespace test
+```
