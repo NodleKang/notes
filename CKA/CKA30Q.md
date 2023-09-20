@@ -1116,28 +1116,106 @@ kubectl exec -it pod-secrets-via-env -- env
 
 ## 18. Ingress 구성
 
-### 문제
+인그레스는 클러스터 외부에서 클러스터 내부 서비스로 HTTP와 HTTPS 경로를 노출합니다. 트래픽 라우팅은 인그레스 리소스에 정의된 규칙에 의해 제어됩니다.
+
+### 문제 
 
 ```
+Cluster: kubectl config use-context k8s
+- Application Service 운영
+  - ingress-nginx namespace에 nginx 이미지를 app=nginx 레이블을 가지고 실행하는 nginx pod를 구성하시요.
+  - 앞서 생성한 nginx Pod를 서비스하는 nginx service를 생성하시오.
+  - 현재 appjs-service Service는 이미 동작 중입니다. 별도 구성이 필요 없습니다.
+- Ingress 구성
+  - app-ingress.yaml 파일을 생성하여 다음 조건의 ingress 서비스를 구성하시오.
+    - ingress name: app-ingress
+    - 30080 포트  NodePort 서비스는 사전에 구성되어 있습니다.
+    - NODE_PORT:30080/ 접속했을 때 nginx 서비스로 연결
+    - NODE_PORT:30080/app 접속했을 떄 appjs-service 서비스로 연결
+    - ingress 구성에 다음의 annotation을 포함하시오.
+      annotations:
+        kubernetes.io/ingress.class: nginx
 ```
+
+### K8S 도큐먼트 사이트 참조
+
+검색 키워드: `ingress` 
+
+https://kubernetes.io/docs/concepts/services-networking/ingress/#the-ingress-resource
 
 ### 답안
 
-
+컨텍스트를 적용합니다.
 ```sh
-```
-```sh
-```
-```sh
-```
-```sh
-```
-```sh
+kubectl config use-context k8s
 ```
 
-## 18. 기출 - Ingress 구성
+nginx 파드를 구성하고 확인합니다.
+```sh
+kubectl run nginx --image=nginx --labels=app=nginx -n ingress-nginx
+kubectl get pod -n ingress-nginx
+```
 
-### 문제
+nginx 파드에 대한 서비스를 expose하고 확인합니다.
+```sh
+kubectl expose -n ingress-nginx pod nginx --port=80 --target-port=80
+kubectl desribe svc -n ingress-nginx
+```
+
+ingress에 연결할 서비스들의 포트를 확인합니다.
+```sh
+kubectl get svc -n ingress-nginx
+NAME           TYPE       CLUSTER-IP     EXTERNAL-IP  PORT(S)  AGE
+appjs-service  ClusterIP  10.101.79.81   <none>       80/TCP   110d
+nginx          ClusterIP  10.106.127.46  <none>       80/TCP   3m12s
+```
+
+ingress 정의 파일을 작성합니다.
+```sh
+vi app-ingress.yaml
+```
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  namespace: ingress-nginx # 네임스페이스 지정
+  name: app-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    kubernetes.io/ingress.class: nginx
+spec:
+  rules:
+  - http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: nginx
+            port:
+              number: 80 # 서비스에서 확인한 포트
+      - path: /app
+        pathType: Prefix
+        backend:
+          service:
+            name: appjs-service
+            port:
+              number: 80 # 서비스에서 확인한 포트
+```
+
+파일을 이용해서 ingress를 생성하고 확인합니다.
+```sh
+kubectl apply -f app-ingress.yaml
+kubectl describe ingress -n ingress-nginx app-ingress
+```
+
+URL에 따라 잘 동작하는지 확인합니다.
+```sh
+curl k8s-workder1:30080/
+curl k8s-workder1:30080/app
+```
+
+### 참고 - 기출 문제
 
 ```
 Create a new nginx Ingress resource as follows:
@@ -1149,30 +1227,58 @@ The availability of service hi can be checked using the following command which 
 curl -KL <INTERNAL_IP>/hi
 ```
 
-### 답안
-
-
-```sh
-```
-```sh
-```
-```sh
-```
-```sh
-```
-```sh
-```
-
 ## 19. Persistent Volume 생성
 
 ### 문제
 
 ```
+kubectl config use-context k8s
+- Create a persistent volume with name app-config, of capacity 1Gi and access mode ReadWriteMany.
+- storageClass: az-c
+- The type of volume is hostPath and its location is /srv/app-config.
 ```
+
+### K8S 도큐먼트 사이트 참조
+
+검색 키워드: `Persistent Volumes` 
+
+https://kubernetes.io/docs/concepts/storage/persistent-volumes/#persistent-volumes
+
+https://kubernetes.io/docs/tasks/configure-pod-container/configure-persistent-volume-storage/#create-a-persistentvolumeclaim
 
 ### 답안
 
+
+컨텍스트를 적용합니다.
+```sh
+kubectl config use-context k8s
 ```
+
+PV 생성을 위한 yaml 파일을 작성합니다.
+```sh
+vi app-pv.yaml
+```
+```yaml
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: app-config
+  labels:
+    type: local
+spec:
+  storageClassName: az-c
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteMany
+  hostPath:
+    path: "/srv/app-config"
+```
+
+작성한 파일을 이용해서 pv를 생성하고 확인합니다.
+```sh
+kubectl apply -f app-pv.yaml
+kubectl describe pv -n app-config
 ```
 
 ## 20. Persistent Volume Claim을 사용하는 Pod
@@ -1180,20 +1286,93 @@ curl -KL <INTERNAL_IP>/hi
 ### 문제
 
 ```
+Cluster: kubectl config use-context k8s
+- Create a new PersistentVolumeClaim
+  - name: app-volume
+  - StorageClass: app-hostpath-sc
+  - Capacity: 10Mi
+- Create a new Pod which mounts the PersistentVolumeClaim as a volume
+  - nane: web-server-pod
+  - image: nginx
+  - mount path: /usr/share/nginx/html
+- Configure the new Pod to have ReadWriteMany access on the volume
 ```
+
+### K8S 도큐먼트 사이트 참조
+
+검색 키워드: `persistent volume claim` 
+
+https://kubernetes.io/docs/tasks/configure-pod-container/configure-persistent-volume-storage/#create-a-persistentvolumeclaim
 
 ### 답안
 
 
+컨텍스트를 적용합니다.
 ```sh
+kubectl config use-context k8s
 ```
+
+PVC 생성을 위한 yaml 파일을 작성합니다.
 ```sh
+vi pvc.yaml
 ```
-```sh
+```yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: app-volume
+spec:
+  storageClassName: app-hostpath-sc
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 10Mi
 ```
+
+작성한 파일을 이용해서 pvc를 생성합니다.
 ```sh
+kubectl apply -f pvc.yaml
 ```
+
+생성된 pvc를 확인하면 PV를 지정하지 않았음에도 기존에 존재하던 PV 중 적합한 PV가 사용된 것이 확인됩니다.
 ```sh
+kubectl get pvc
+```
+
+Kubernetes 문서를 참고해서 파드 생성욜 yaml 파일을 작성합니다.
+```sh
+vi web-server-pod.yaml
+```
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: web-server-pod
+spec:
+  volumes:
+    - name: app-volume-storage
+      persistentVolumeClaim:
+        claimName: app-volume
+  containers:
+    - name: web-server-pod
+      image: nginx
+      ports:
+        - containerPort: 80
+          name: "http-server"
+      volumeMounts:
+        - mountPath: "/usr/share/nginx/html"
+          name: app-volume-storage
+```
+
+작성한 파일을 이용해서 파드를 생성합니다.
+```sh
+kubectl apply -f web-server-pod.yaml
+```
+
+파드 상세정보에서 volumeMount 정보를 확인합니다.
+```sh
+kubectl describe pod web-server-pod
 ```
 
 ## 21. Check Resource Information
@@ -1205,6 +1384,11 @@ curl -KL <INTERNAL_IP>/hi
 
 ### 답안
 
+
+컨텍스트를 적용합니다.
+```sh
+kubectl config use-context k8s
+```
 
 ```sh
 ```
@@ -1227,6 +1411,11 @@ curl -KL <INTERNAL_IP>/hi
 ### 답안
 
 
+컨텍스트를 적용합니다.
+```sh
+kubectl config use-context k8s
+```
+
 ```sh
 ```
 ```sh
@@ -1247,6 +1436,11 @@ curl -KL <INTERNAL_IP>/hi
 
 ### 답안
 
+
+컨텍스트를 적용합니다.
+```sh
+kubectl config use-context k8s
+```
 
 ```sh
 ```
@@ -1269,6 +1463,11 @@ curl -KL <INTERNAL_IP>/hi
 ### 답안
 
 
+컨텍스트를 적용합니다.
+```sh
+kubectl config use-context k8s
+```
+
 ```sh
 ```
 ```sh
@@ -1289,6 +1488,11 @@ curl -KL <INTERNAL_IP>/hi
 
 ### 답안
 
+
+컨텍스트를 적용합니다.
+```sh
+kubectl config use-context k8s
+```
 
 ```sh
 ```
@@ -1311,6 +1515,11 @@ curl -KL <INTERNAL_IP>/hi
 ### 답안
 
 
+컨텍스트를 적용합니다.
+```sh
+kubectl config use-context k8s
+```
+
 ```sh
 ```
 ```sh
@@ -1331,6 +1540,11 @@ curl -KL <INTERNAL_IP>/hi
 
 ### 답안
 
+
+컨텍스트를 적용합니다.
+```sh
+kubectl config use-context k8s
+```
 
 ```sh
 ```
@@ -1353,6 +1567,11 @@ curl -KL <INTERNAL_IP>/hi
 ### 답안
 
 
+컨텍스트를 적용합니다.
+```sh
+kubectl config use-context k8s
+```
+
 ```sh
 ```
 ```sh
@@ -1374,6 +1593,11 @@ curl -KL <INTERNAL_IP>/hi
 ### 답안
 
 
+컨텍스트를 적용합니다.
+```sh
+kubectl config use-context k8s
+```
+
 ```sh
 ```
 ```sh
@@ -1384,6 +1608,7 @@ curl -KL <INTERNAL_IP>/hi
 ```
 ```sh
 ```
+
 ## 30. Network Policy
 
 ### 문제
@@ -1393,6 +1618,11 @@ curl -KL <INTERNAL_IP>/hi
 
 ### 답안
 
+
+컨텍스트를 적용합니다.
+```sh
+kubectl config use-context k8s
+```
 
 ```sh
 ```
