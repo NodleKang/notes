@@ -1524,8 +1524,24 @@ console$ kubectl uncordon k8s-master
 
 ### 문제
 
+Not Ready 상태의 노드를 활성화하시오.
+
 ```
+A Kubernetes worker node, named hk8s-w2 is in state NotReady.
+Investigate why this is the case, and perform any appropriate steps to bring the node to a Ready state, ensuring that any changes are made permanent.
 ```
+
+### K8S 도큐먼트 사이트 참조
+
+검색 키워드: `upgrade` 키워드 검색된 페이지에서 버전에 맞는 페이지에 나오는 내용을 그대로 따라하기
+
+https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade
+
+### 참고: worker 노드의 주요 컴포넌트의 역할
+
+- containerd: 컨테이너를 동작시켜주는 컨테이너 엔진
+- kubelet: 클러스터를 운영해주는 역할
+- kube-proxy: 쿠버네티스의 네트웍을 구성 = 클라이언트의 커넥션을 받아주는 네트웍 포트 listen, worker node안에 iptables 등을 이용해서 서비스 구성 등
 
 ### 답안
 
