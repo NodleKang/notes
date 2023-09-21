@@ -1306,7 +1306,6 @@ https://kubernetes.io/docs/tasks/configure-pod-container/configure-persistent-vo
 
 ### 답안
 
-
 컨텍스트를 적용합니다.
 ```sh
 kubectl config use-context k8s
@@ -1379,11 +1378,21 @@ kubectl describe pod web-server-pod
 
 ### 문제
 
+다양한 리소스(파드,서비스,PV 등)에 대한 정보를 조회하고 파일로 남기기
+
 ```
+Set configuration context: kubectl config use-context k8s
+- List all 'PV's sorted by name saving the full kubectl output to /var/CKA2023/my_volumes.
+- Use kubectl's own functionally for sorting the output, and do not manipluate it any further.
 ```
+
+### K8S 도큐먼트 사이트 참조
+
+검색 키워드: `cheat sheet` 키워드 검색된 페이지에서 sort로 검색하면 원하는 명령을 찾기 쉬움
+
+https://kubernetes.io/docs/reference/kubectl/cheatsheet/#viewing-and-finding-resources
 
 ### 답안
-
 
 컨텍스트를 적용합니다.
 ```sh
@@ -1391,40 +1400,124 @@ kubectl config use-context k8s
 ```
 
 ```sh
-```
-```sh
-```
-```sh
-```
-```sh
-```
-```sh
+kubectl get pv -A --sort-by=.metadata.name > /var/CKA2023/my_volumes
 ```
 
 ## 22. Kubernetes Upgrade
 
 ### 문제
 
+Master 노드만 업그레이드하기
+
 ```
+upgrade system: k8s-master
+Given an existing Kubernetes cluster running version 1.26.0.
+upgrade all of the Kubernetes control plane and node components on the master node only to version 1.27.1.
+Be sure to drain the master node before upgrading it and uncordon it after upgrade.
 ```
+
+### K8S 도큐먼트 사이트 참조
+
+검색 키워드: `upgrade` 키워드 검색된 페이지에서 버전에 맞는 페이지에 나오는 내용을 그대로 따라하기
+
+https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade
+
+### 참고: 쿠버네티스 설치
+
+1. 1단계
+모든 노드(control plane, worker1, worker2, ...)에 컨테이너 엔진 containerd를 설치합니다.
+2. 2단계 - 시험상 update해야 하는 대상
+모든 노드(control plane, worker1, worker2, ...)에 설치도구인 kubeadm를 설치하고, kubelet도 설치합니다. kubelet은 `systemctl start kubelet`으로 서비스를 시작합니다.
+3. 3단계 - 시험상 update해야 하는 대상
+control plane 노드에서 kubeadm을 이용해서 apiserver, controller, scheduler, etcd 등을 실행합니다.
+4. 4단계 - 시험상 update해야 하는 대상
+worker 노드에서 kubeadm join master 합니다.
+
+시험환경의 kubernetes 설치 도구는 모두 kubeadm 입니다.
 
 ### 답안
 
-
-컨텍스트를 적용합니다.
+control plane 노드(master노드)로 이동합니다.
 ```sh
-kubectl config use-context k8s
+console$ ssh k8s-master
 ```
 
+root 유저로 전환합니다.
 ```sh
+user@k8s-master$ sudo -i
 ```
+
+업그레이드할 버전 정보를 가져오기 위해 명령을 실행합니다.
+
 ```sh
+root@k8s-master# apt update
+root@k8s-master# apt-cache madison kubeadm
 ```
+
+kubeadm 업그레이드를 합니다. (버전 지정에 주의하세요)
+
 ```sh
+root@k8s-master# apt-mark unhold kubeadm && \
+ apt-get update && apt-get install -y kubeadm=1.27.x-00 && \
+ apt-mark hold kubeadm
 ```
+
+설치된 kubeadm 버전을 확인합니다.
 ```sh
+root@k8s-master# kubeadm version
 ```
+
+control plane 노드에 있는 컴포넌트들(apiserver, controller, scheduler, etcd 등)을 어떤 버전까지 업그레이드 할 수 있는지 확인합니다.
 ```sh
+root@k8s-master# kubeadm upgrade plan
+```
+
+control plane 노드에 있는 컴포넌트들을 업그레이드 합니다.
+```sh
+root@k8s-master# sudo kubeadm upgrade apply v1.27.x
+```
+
+잘 진행됐다면 아래와 같은 메세지를 확인합니다.
+```sh
+[upgrade/successful] SUCCESS! Your cluster was upgraded to "v1.27.x". Enjoy!
+```
+
+kubelet을 업그레이드하기 위해 control plane 노드에서 파드들을 모두 비우고 스케줄을 못 받게 합니다. 이 작업은 kubectl 명령을 사용해야 하므로 control plane 노드 외부로 나간 후에 작업합니다.
+```sh
+root@k8s-master# exit
+user@k8s-master# exit
+console$ kubectl drain k8s-master --ignore-daemonsets
+```
+
+모든 노드들의 상태를 확인해서 control plane 노드가 Scheduling을 받지 않게 된 것을 확인합니다.
+```sh
+console$ kubectl get nodes
+```
+
+다시 control plane 노드에 root 유저로 접속합니다.
+```sh
+console$ ssh k8s-master
+user@k8s-master$ sudo -i
+```
+
+kubelet과 kubectl을 업그레이드 합니다.
+```sh
+root@k8s-master# apt-mark unhold kubelet kubectl && \
+apt-get update && apt-get install -y kubelet=1.27.x-00 kubectl=1.27.x-00 && \
+apt-mark hold kubelet kubectl
+```
+
+kubelet을 재시작합니다.
+```sh
+root@k8s-master# sudo systemctl daemon-reload
+root@k8s-master# sudo systemctl restart kubelet
+```
+
+control plane 노드가 스케줄링 받을 수 있게 합니다. 이 작업은 kubectl 명령을 사용해야 하므로 control plane 노드 외부로 나간 후에 작업합니다.
+```sh
+root@k8s-master# exit
+user@k8s-master# exit
+console$ kubectl uncordon k8s-master
 ```
 
 ## 23. Troubleshooting (1)
@@ -1435,7 +1528,6 @@ kubectl config use-context k8s
 ```
 
 ### 답안
-
 
 컨텍스트를 적용합니다.
 ```sh
@@ -1462,7 +1554,6 @@ kubectl config use-context k8s
 
 ### 답안
 
-
 컨텍스트를 적용합니다.
 ```sh
 kubectl config use-context k8s
@@ -1487,7 +1578,6 @@ kubectl config use-context k8s
 ```
 
 ### 답안
-
 
 컨텍스트를 적용합니다.
 ```sh
@@ -1514,7 +1604,6 @@ kubectl config use-context k8s
 
 ### 답안
 
-
 컨텍스트를 적용합니다.
 ```sh
 kubectl config use-context k8s
@@ -1539,7 +1628,6 @@ kubectl config use-context k8s
 ```
 
 ### 답안
-
 
 컨텍스트를 적용합니다.
 ```sh
@@ -1566,7 +1654,6 @@ kubectl config use-context k8s
 
 ### 답안
 
-
 컨텍스트를 적용합니다.
 ```sh
 kubectl config use-context k8s
@@ -1591,7 +1678,6 @@ kubectl config use-context k8s
 ```
 
 ### 답안
-
 
 컨텍스트를 적용합니다.
 ```sh
