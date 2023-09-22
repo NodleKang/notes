@@ -1537,78 +1537,200 @@ Investigate why this is the case, and perform any appropriate steps to bring the
 
 https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade
 
-### 참고: worker 노드의 주요 컴포넌트의 역할
+### 참고: worker 노드가 Ready 상태가 되기 위해 필수적인 요소들
 
 - containerd: 컨테이너를 동작시켜주는 컨테이너 엔진
 - kubelet: 클러스터를 운영해주는 역할
 - kube-proxy: 쿠버네티스의 네트웍을 구성 = 클라이언트의 커넥션을 받아주는 네트웍 포트 listen, worker node안에 iptables 등을 이용해서 서비스 구성 등
+- CNI(Contain Network Interface): 컨테이너간 통신과 외부 네트워크와 연결을 관리하는 인터페이스 제공 (flannel, calico 등)
 
 ### 답안
 
 컨텍스트를 적용합니다.
 ```sh
-kubectl config use-context k8s
+kubectl config use-context hk8s
 ```
 
+노드들의 상태를 확인하여, NotReady 상태인 노드를 확인합니다.
 ```sh
+console$ kubectl get nodes
 ```
+
+NotReady 상태인 노드에 접속하고 root 유저로 전환합니다.
 ```sh
+console$ ssh hk8s-w2
+user@hk8s-w2$ sudo -i
+root@hk8s-w2#
 ```
+
+containerd(컨테이너 엔진) 상태가 active (running) 상태인지 확인합니다.
 ```sh
+root@hk8s-w2# systemctl status containerd
 ```
+
+kubelet 상태가 active (running) 상태인지 확인합니다.
 ```sh
+root@hk8s-w2# systemctl status kubelet
 ```
+
+kubelet 상태가 active (running) 상태가 아니므로 지금 즉시 실행시키고 다음 부팅시에도 실행되도록 합니다.
 ```sh
+root@hk8s-w2# systemctl enable --now kubelet
+```
+
+다시 kubelet 상태가 active (running) 상태인지 확인합니다.
+```sh
+root@hk8s-w2# systemctl status kubelet
+```
+
+kube-proxy와 CNI 관련 파드들의 상태가 Running인지 확인합니다. (이 작업은 콘솔로 나가서 pod 상태로 확인해야 합니다.) <br>
+CNI 관련 Pod들은 calico- 혹은 flannel-인 경우가 대부분입니다.
+```sh
+root@hk8s-w2# exit
+user@hk8s-w2# exit
+console$ kubectl get pod -n kube-system -o wide
+```
+
+노드들의 상태를 확인하여, 모든 노드가 Ready 상태가 되었는지 확인합니다.
+```sh
+console$ kubectl get nodes
 ```
 
 ## 24. Troubleshooting (2)
 
 ### 문제
 
+Not Ready 상태의 노드를 활성화하시오.
+
 ```
+A Kubernetes worker node, named hk8s-w2 is in state NotReady.
+Investigate why this is the case, and perform any appropriate steps to bring the node to a Ready state, ensuring that any changes are made permanent.
 ```
 
 ### 답안
 
 컨텍스트를 적용합니다.
 ```sh
-kubectl config use-context k8s
+kubectl config use-context hk8s
 ```
 
+노드들의 상태를 확인하여, NotReady 상태인 노드를 확인합니다.
 ```sh
+console$ kubectl get nodes
 ```
+
+NotReady 상태인 노드에 접속하고 root 유저로 전환합니다.
 ```sh
+console$ ssh hk8s-w2
+user@hk8s-w2$ sudo -i
+root@hk8s-w2#
 ```
+
+containerd(컨테이너 엔진) 상태가 active (running) 상태인지 확인합니다.
 ```sh
+root@hk8s-w2# systemctl status containerd
 ```
+
+containerd(컨테이너 엔진) 상태가 상태가 아니므로 지금 즉시 실행시키고 다음 부팅시에도 실행되도록 합니다.
 ```sh
+root@hk8s-w2# systemctl enable --now containerd
 ```
+
+다시 containerd(컨테이너 엔진) 상태가 active (running) 상태인지 확인합니다.
 ```sh
+root@hk8s-w2# systemctl status containerd
+```
+
+kubelet 상태가 active (running) 상태인지 확인합니다.
+```sh
+root@hk8s-w2# systemctl status kubelet
+```
+
+kube-proxy와 CNI 관련 파드들의 상태가 Running인지 확인합니다. (이 작업은 콘솔로 나가서 pod 상태로 확인해야 합니다.) <br>
+CNI 관련 Pod들은 calico- 혹은 flannel-인 경우가 대부분입니다.
+```sh
+root@hk8s-w2# exit
+user@hk8s-w2# exit
+console$ kubectl get pod -n kube-system -o wide
+```
+
+노드들의 상태를 확인하여, 모든 노드가 Ready 상태가 되었는지 확인합니다.
+```sh
+console$ kubectl get nodes
 ```
 
 ## 25. User Role Binding
 
 ### 문제
 
+User API 인증(authentication) 구성하기
 ```
+Cluster: kubectl config use-context k8s
+
+Task:
+Create the kubeconfig named ckauser:
+- username: ckauser
+- certificate location: /data/cka/ckauser.crt, /data/cka/ckauser.key
+- context-name: ckauser
+- ckauser cluster must be operated with the privileges of the ckauser account.
+
+Create a role named pod-role that can create, delete, watch, list, get pods.
+Create the following rolebinding.
+- name: pod-rolebinding
+- role: pod-role
+- user: ckauser
 ```
+
+### K8S 도큐먼트 사이트 참조
+
+검색 키워드: `csr`
+
+https://kubernetes.io/docs/reference/access-authn-authz/certificate-signing-requests/#create-role-and-rolebinding
+
+### 참고: API 인증
+
+1. User
+user가 kubectl 같은 명령을 통해서 apiserver에 요청을 하면, apiserver는 인증(authentication)을 한 후에 권한(authorization)을 검사하고 명령을 실행합니다.
+2. Service Account
+모든 컨테이너는 Service Account라는 걸 가지고 동작합니다. apiserver는 Service Account가 가진 권한에 따라서 컨테이너의 요청을 실행하기도 거부하기도 합니다.
 
 ### 답안
 
-컨텍스트를 적용합니다.
+role을 생성합니다. 명령문은 검색된 k8s document 가장 하단을 참고합니다.
 ```sh
-kubectl config use-context k8s
+kubectl create role pod-role --verb=create,delete,watch,list,get --resource=pods
 ```
 
+생성한 role을 확인합니다.
 ```sh
+kubectl describe role pod-role
 ```
+
+rolebinding을 생성합니다.
 ```sh
+kubectl create rolebinding pod-rolebinding --role=pod-role --user=ckauser
 ```
+
+생성한 rolebinding을 확인합니다.
 ```sh
+kubectl describe rolebinding pod-rolebinding
 ```
+
+kubeconfig에 user와 credentials를 추가합니다.
 ```sh
+kubectl config set-credentials ckauser --client-key=/data/cka/ckauser.key --client-certificate=/data/cka/ckauser.crt --embed-certs=true
 ```
+
+context를 추가합니다.
 ```sh
+kubectl config set-context ckauser --cluster=kubernetes --user=ckauser
+```
+
+생성한 컨텍스트를 적용하고, 확인합니다.
+```sh
+kubectl config use-context ckauser
+kubectl get pods # 실행 가능한 명령
+kubectl get svc # 권한이 없으므로 실행 불가능한 명령
 ```
 
 ## 26. User Cluster Role Binding
@@ -1616,7 +1738,26 @@ kubectl config use-context k8s
 ### 문제
 
 ```
+Cluster: kubectl config use-context k8s
+
+Task:
+- Create a new ClusterRole named app-clusterrole, which only allows to get,watch,list the following resource types: Deployment, Service
+- Bind the new ClusterRole app-clusterrole to the new user ckauser.
+- User ckauser and ckauser clusters are already configured.
+- To check the results, run the following command:
+  kubectl config use-context ckauser
 ```
+
+### Role과 Cluster Role의 차이
+
+- Role: 특정 namespace에서만 적용되는 권한을 가질 수 있다.
+- Cluster Role: namespace에 관계없이 클러스터 전체에 적용되는 권한을 가질 수 있다.
+
+### K8S 도큐먼트 사이트 참조
+
+검색 키워드: `clusterrole`
+
+https://kubernetes.io/docs/reference/access-authn-authz/rbac/#kubectl-create-clusterrole
 
 ### 답안
 
@@ -1625,15 +1766,36 @@ kubectl config use-context k8s
 kubectl config use-context k8s
 ```
 
+clusterrole을 생성합니다.
 ```sh
+kubectl create clusterrole app-clusterrole --verb=get,list,watch --resource=deployment,service
 ```
+
+셍성한 clusterrole을 확인합니다.
 ```sh
+kubectl describe clusterrole app-clusterrole
 ```
+
+clusterrolebinding을 생성합니다.
 ```sh
+kubectl create clusterrolebinding app-clusterrole-binding --clusterrole=app-clusterrole --user=ckauser
 ```
+
+생성한 clusterrolebinding을 확인합니다.
 ```sh
+kubectl describe clusterrolebinding app-clusterrole-binding
 ```
+
+생성한 컨텍스트를 적용하고, 확인합니다.
 ```sh
+kubectl config use-context ckauser
+kubectl get svc -A # 실행 가능한 명령
+kubectl get pods -A # 권한이 없으므로 실행 불가능한 명령
+```
+
+원래 컨텍스트를 적용합니다.
+```sh
+kubectl config use-context kubernetes-admin@kubernetes
 ```
 
 ## 27. ServcieAccount Role Binding
@@ -1641,7 +1803,21 @@ kubectl config use-context k8s
 ### 문제
 
 ```
+Cluster: kubectl config use-context k8s
+Create the ServiceAccount named pod-access in a new namespace called apps.
+Create a Role with the name pod-role and the RoleBinding named pod-rolebinding.
+Map the ServiceAccount from the previous step to the API resources Pods with the operations watch,list,get.
 ```
+
+### K8S 도큐먼트 사이트 참조
+
+검색 키워드: `kubectl reference`
+
+https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands
+
+검색 키워드: `csr`
+
+https://kubernetes.io/docs/reference/access-authn-authz/certificate-signing-requests/#create-role-and-rolebinding
 
 ### 답안
 
@@ -1650,23 +1826,61 @@ kubectl config use-context k8s
 kubectl config use-context k8s
 ```
 
+네임스페이스를 생성합니다.
 ```sh
-```
-```sh
-```
-```sh
-```
-```sh
-```
-```sh
+kubectl create ns apps
 ```
 
-## 28. Service Account Role Binding
+ServiceAccount를 생성합니다. (명령문은 kubectl reference 페이지를 참고합니다.)
+```sh
+kubectl create serviceaccount pod-access --namespace apps
+```
+
+생성한 ServiceAccount를 확인합니다.
+```sh
+kubectl sa pod-access --namespace apps
+```
+
+role을 생성합니다. 명령문은 검색된 k8s document 가장 하단을 참고합니다.
+```sh
+kubectl create role pod-role --verb=watch,list,get --resource=pods --namespace apps
+```
+
+생성한 role을 확인합니다.
+```sh
+kubectl get role -n apps
+```
+
+rolebinding을 생성합니다. ServiceAccount와 연결할 때는 namespace정보가 누락되지 않도록 주의합니다.
+```sh
+kubectl create rolebinding pod-rolebinding --role=pod-role --serviceaccount=apps:pod-access --namespace apps
+```
+
+생성한 rolebinding을 확인합니다.
+```sh
+kubectl describe rolebinding pod-rolebinding --namespace apps
+```
+
+## 28. ServiceAccount Cluster Role Binding
 
 ### 문제
 
 ```
+- Create a new ClusterRole named deployment-clusterrole.
+  which only allows to create the follwing resource types: Deployment StatefulSet DaemonSet
+- Create a new ServiceAccount named cicd-token in the existing namespace apps.
+- Bind the new ClusterRole deployment-clusterrole to the new ServiceAccount cicd-token, limited to the namespace apps.
 ```
+
+### K8S 도큐먼트 사이트 참조
+
+검색 키워드: `kubectl reference`
+
+https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands
+
+검색 키워드: `csr`
+
+https://kubernetes.io/docs/reference/access-authn-authz/certificate-signing-requests/#create-role-and-rolebinding
 
 ### 답안
 
@@ -1675,15 +1889,39 @@ kubectl config use-context k8s
 kubectl config use-context k8s
 ```
 
+네임스페이스를 생성합니다.
 ```sh
+kubectl create ns apps
 ```
+
+SerivceAccount를 생성합니다.
 ```sh
+kubectl create serviceaccount cicd-token -n apps
 ```
+
+생성한 ServiceAccount를 확인합니다.
 ```sh
+kubectl sa pod-access --namespace apps
 ```
+
+clusterrole을 생성합니다. (문제에 namespace 지정이 없었으므로 생략)
 ```sh
+kubectl create clusterrole deployment-clusterrole --verb=create --resource=deployment,statefulset,daemonset
 ```
+
+생성한 clusterrole을 확인합니다.
 ```sh
+kubectl get clusterrole -A
+```
+
+clusterrolebinding을 생성합니다. ServiceAccount와 연결할 때는 namespace정보가 누락되지 않도록 주의합니다.
+```sh
+kubectl create clusterrolebinding deployment-clusterrole-binding --clusterrole=deployment-clusterrole --serviceaccount=apps:cicd-token
+```
+
+생성한 clusterrolebinding을 확인합니다.
+```sh
+kubectl describe clusterrolebinding deployment-clusterrole-binding
 ```
 
 ## 29. Kube-DNS
