@@ -1929,7 +1929,33 @@ kubectl describe clusterrolebinding deployment-clusterrole-binding
 ### 문제
 
 ```
+작업 클러스터: k8s
+
+- Create a nginx pod called nginx-resolver using image nginx, expose it internally with a service called nginx-resolver-service.
+- Test that you are able to look up the service and pod names from within the cluster. 
+  Use this image: busybox:1.28 for dns lookup.
+  - Record results in /tmp/nginx.svc and /tmp/nginx.pod
+  - pod: nginx-resolver created
+  - Service DNS Resolution recorded correctly
+  - Pod DNS resolution recorded correctly
 ```
+
+### K8S 도큐먼트 사이트 참조
+
+검색 키워드: `dns`
+
+https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/
+
+쿠버네티스에서 동작하는 모든 파드는 기본적으로 /etc.resolv.conf 파일에 DNS서버의 정보(nameserver 정보, search 옵션 등)를 갖습니다. 즉, 그 정보가 coreDNS 정보입니다.
+
+nslookup 명령은 nameserver에게 
+
+#### DNS Records
+
+1. 서비스용 DNS 형식: <서비스이름>.<네임스페이스>.svc.<클러스터도메인>
+2. 파드용 DNS 형식: <파드의IP>.<네임스페이스>.pod.<클러스터도메인>
+
+클러스터도메인의 기본 값 = clsuter.local
 
 ### 답안
 
@@ -1938,39 +1964,113 @@ kubectl describe clusterrolebinding deployment-clusterrole-binding
 kubectl config use-context k8s
 ```
 
+파드를 생성합니다.
 ```sh
+kubectl run nginx-resolver --image=nginx
 ```
+
+생성한 파드 상세정보에서 서비스할 포트와 IP를 확인합니다.
 ```sh
+kubectl describe pod nginx-resolver
 ```
+
+확인한 포트를 바탕으로 생성한 파드를 위한 서비스를 생성합니다.
 ```sh
+kubectl expose pod nginx-resolver --name nginx-resolver-service --port=80 --target-port=80
 ```
+
+busybox:1.28 이미지를 이용해서 테스트용 파드를 생성하고, 테스트용 파드에서 nslookup 명령을 사용해서 서비스의 DNS lookup을 한 결과를 파일에 담습니다.
 ```sh
+kubectl run test-pod --image=busybox:1.28 --rm -it --restart=Never -- nslookup nginx-resolver-service.default.svc.cluster.local > /tmp/nginx.svc
 ```
+
+busybox:1.28 이미지를 이용해서 테스트용 파드를 생성하고, 테스트용 파드에서 nslookup 명령을 사용해서 파드의 DNS lookup을 한 결과를 파일에 담습니다. 이 때, nginx-resolver 파드의 IP는 앞에서 파드를 생성한 후에 확인한 IP를 사용합니다.
 ```sh
+kubectl run test-pod --image=busybox:1.28 --rm -it --restart=Never -- nslookup 10-244-1-163.default.pod.cluster.local > /tmp/nginx.pod
+```
+
+작성된 파일 내용을 확인합니다.
+```sh
+cat /tmp/nginx.svc
+cat /tmp/nginx.pod
 ```
 
 ## 30. Network Policy
 
 ### 문제
 
+Network Policy with Namespace
+
 ```
+작업 클러스터: hk8s
+- Create a new NetworkPolicy named allow-port-from-namespace in the existing namespace devops.
+- Ensure that the new NetworkPolidy allow Pods in namespace migops to connect to port 80 of Pods in namespace devops.
 ```
+
+### K8S 도큐먼트 사이트 참조
+
+검색 키워드: `network policy`
+
+https://kubernetes.io/docs/concepts/services-networking/network-policies/
+
+
+- AWS의 Security Group에 하는 ingress, egress 설정과 유사합니다.
+- Ingress는 ip 범위, namespace, pod를 대상으로 적용할 수 있으며, egress는 ip범위에만 적용할 수 있습니다.
 
 ### 답안
 
-
 컨텍스트를 적용합니다.
 ```sh
-kubectl config use-context k8s
+kubectl config use-context hk8s
 ```
 
+devops와 migops 네임스페이스가 있는지 확인합니다.
 ```sh
+kubectl get ns
 ```
+
+migops 네임스페이스가 team=migops 레이블을 가지고 있는 것을 확인합니다.
 ```sh
+kubectl get ns migops --show-labels
 ```
+
+devops 네임스페이스에 있는 파드들이 app=web 레이블을 가지고 있는 것을 확인합니다.
 ```sh
+kubectl get pods -n devops --show-labels
 ```
+
+K8S 도큐먼트를 참고하여 NetworkPolicy 용도의 yaml 파일을 작성합니다.
 ```sh
+vi networkpolicy.yaml
 ```
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-port-from-namespace
+  namespace: devops # devops 네임스페이스에
+spec:
+  podSelector:
+    matchLabels:
+      app: web # 레이블이 app=web인 파드들을 대상으로
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              team: migops # 네임스페이스 레이블이 team=migops인 경우
+      ports:
+        - protocol: TCP
+          port: 80 # 80포트로 접근을 허용함
+```
+
+작성한 파일을 적용합니다.
 ```sh
+kubectl apply -f networkpolicy.yaml
+```
+
+생성한 NetworkPolicy를 확인합니다.
+```sh
+kubectl get networkpolicy -n devops
 ```
